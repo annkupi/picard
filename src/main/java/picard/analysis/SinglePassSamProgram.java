@@ -74,7 +74,23 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
      */
     @Override
     protected final int doWork() {
+
+        //begin time measurement
+        long beginTime, endTime, runningTime;
+        System.out.print("BEGINTIME: ");
+        beginTime=System.nanoTime();
+        System.out.println(beginTime);
+
         makeItSo(INPUT, REFERENCE_SEQUENCE, ASSUME_SORTED, STOP_AFTER, Arrays.asList(this));
+
+        //end time measurement
+        System.out.print("ENDTIME: ");
+        endTime = System.nanoTime();
+        System.out.println(endTime);
+        runningTime = endTime - beginTime;
+        System.out.print("RUNTIME in m-seconds: ");
+        System.out.println((endTime - beginTime)/1000000);
+
         return 0;
     }
 
@@ -126,7 +142,21 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
 
         final ProgressLogger progress = new ProgressLogger(log);
 
+        //begin cycle time measurment
+        long beginCycleTime, endCycleTime, runningCycleTime;
+        System.out.print("BEGINCYCLETIME: ");
+        beginCycleTime=System.nanoTime();
+        System.out.println(beginCycleTime);
+
+        long processingTime = 0;
+        long littleProcessingTime = 0;
+
+        /* OLD WAY TO READ AND PROCESS */
+        /**/
         for (final SAMRecord rec : in) {
+
+            //begin processing time measurment
+            long beginProcessingTime = System.nanoTime();
             final ReferenceSequence ref;
             if (walker == null || rec.getReferenceIndex() == SAMRecord.NO_ALIGNMENT_REFERENCE_INDEX) {
                 ref = null;
@@ -134,9 +164,16 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
                 ref = walker.get(rec.getReferenceIndex());
             }
 
+            //begin little processing time measurment
+            long beginLittleProcessingTime=System.nanoTime();
+
             for (final SinglePassSamProgram program : programs) {
                 program.acceptRead(rec, ref);
             }
+
+            //end little processing time measurment
+            long endLittleProcessingTime=System.nanoTime();
+            littleProcessingTime += endLittleProcessingTime - beginLittleProcessingTime;
 
             progress.record(rec);
 
@@ -149,7 +186,32 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
             if (!anyUseNoRefReads && rec.getReferenceIndex() == SAMRecord.NO_ALIGNMENT_REFERENCE_INDEX) {
                 break;
             }
+
+            //end processing time measurment
+            long endProcessingTime=System.nanoTime();
+            processingTime += endProcessingTime - beginProcessingTime;
+
         }
+        /**/
+
+        //end cycle time measurment
+        System.out.print("ENDCYCLETIME: ");
+        endCycleTime=System.nanoTime();
+        System.out.println(endCycleTime);
+        runningCycleTime = endCycleTime - beginCycleTime;
+        System.out.print("RUNCYCLETIME in m-seconds: ");
+        System.out.println((endCycleTime - beginCycleTime)/1000000);
+
+        //processing and reading time
+        System.out.print("PROCESSINGTIME in m-seconds: ");
+        System.out.println((processingTime)/1000000);
+        System.out.print("PROCESSINGTIME (little) in m-seconds: ");
+        System.out.println((littleProcessingTime)/1000000);
+
+        System.out.print("READTIME in m-seconds: ");
+        long readTime = runningCycleTime - processingTime;
+        System.out.println((readTime)/1000000);
+
 
         CloserUtil.close(in);
 
