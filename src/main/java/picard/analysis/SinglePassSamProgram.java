@@ -75,7 +75,7 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
     @Override
     protected final int doWork() {
 
-        //begin time measurement
+        //Begin time measurement
         long beginTime, endTime, runningTime;
         System.out.print("BEGINTIME: ");
         beginTime=System.nanoTime();
