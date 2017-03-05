@@ -45,6 +45,10 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
 
+import java.util.*;
+import java.util.concurrent.*;
+import java.lang.Runnable;
+
 /**
  * Super class that is designed to provide some consistent structure between subclasses that
  * simply iterate once over a coordinate sorted BAM and collect information from the records
@@ -151,8 +155,15 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
         long processingTime = 0;
         long littleProcessingTime = 0;
 
-        /* OLD WAY TO READ AND PROCESS */
+        /* NEW WAY TO READ AND PROCESS */
         /**/
+
+        ExecutorService exService = Executors.newCachedThreadPool();
+
+        final int MAX_PAIRS = 1000;
+
+        List<RecAndRef> pairs = new ArrayList<>(MAX_PAIRS);
+
         for (final SAMRecord rec : in) {
 
             //begin processing time measurment
@@ -165,15 +176,34 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
             }
 
             //begin little processing time measurment
-            long beginLittleProcessingTime=System.nanoTime();
+            //long beginLittleProcessingTime=System.nanoTime();
 
-            for (final SinglePassSamProgram program : programs) {
-                program.acceptRead(rec, ref);
+            pairs.add(new RecAndRef(rec, ref));
+            if (pairs.size() < MAX_PAIRS){
+                continue;
             }
 
+            final List<RecAndRef> pairsTmp = pairs;
+            pairs = new ArrayList<RecAndRef>(MAX_PAIRS);
+
+            exService.submit(
+                    new Runnable(){
+                        @Override
+                        public void run(){
+                            for (RecAndRef pair : pairsTmp) {
+                                for (final SinglePassSamProgram program : programs) {
+                                    program.acceptRead(pair.rec, pair.ref);
+                                }
+                            }
+                        }
+                    }
+            );
+
+
+
             //end little processing time measurment
-            long endLittleProcessingTime=System.nanoTime();
-            littleProcessingTime += endLittleProcessingTime - beginLittleProcessingTime;
+            //long endLittleProcessingTime=System.nanoTime();
+            //littleProcessingTime += endLittleProcessingTime - beginLittleProcessingTime;
 
             progress.record(rec);
 
@@ -191,6 +221,15 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
             long endProcessingTime=System.nanoTime();
             processingTime += endProcessingTime - beginProcessingTime;
 
+        }
+
+        exService.shutdown();
+        try {
+
+            exService.awaitTermination(5, TimeUnit.MINUTES);
+
+        }catch (InterruptedException e){
+            e.printStackTrace();
         }
         /**/
 
