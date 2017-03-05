@@ -24,6 +24,7 @@
 
 package picard.analysis;
 
+import com.google.common.collect.Iterables;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileHeader.SortOrder;
 import htsjdk.samtools.SAMRecord;
@@ -48,6 +49,8 @@ import java.util.Collection;
 import java.util.*;
 import java.util.concurrent.*;
 import java.lang.Runnable;
+
+import java.util.ArrayList;
 
 /**
  * Super class that is designed to provide some consistent structure between subclasses that
@@ -164,6 +167,16 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
 
         List<RecAndRef> pairs = new ArrayList<>(MAX_PAIRS);
 
+        /*try {
+            long inSize = Iterables.size(in);
+            System.out.println("**inSize**" + inSize + "****");
+        }
+        catch (Exception e)
+        {
+            System.out.print("COUNTING MESSAGE: ");
+            System.out.println(e.getMessage());
+        }*/
+
         for (final SAMRecord rec : in) {
 
             //begin processing time measurment
@@ -185,6 +198,8 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
 
             final List<RecAndRef> pairsTmp = pairs;
             pairs = new ArrayList<RecAndRef>(MAX_PAIRS);
+
+
 
             exService.submit(
                     new Runnable(){
@@ -223,6 +238,13 @@ public abstract class SinglePassSamProgram extends CommandLineProgram {
 
         }
 
+        final List<RecAndRef> pairsTmp = pairs;
+
+        for (RecAndRef pair : pairs) { //leftovers processing
+            for (final SinglePassSamProgram program : programs) {
+                program.acceptRead(pair.rec, pair.ref);
+            }
+        }
         exService.shutdown();
         try {
 
